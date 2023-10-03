@@ -31,8 +31,46 @@ class BpmCalculator:
         "Pos_5_PF": -0.367,
     }
 
-    POSITION_CONSTANTS = {"Pos_1": -0.818, "Pos_3": 0, "Pos_5": 0}
-    OFFENSIVE_ROLE_SLOPE = 1.387
+    OBPM_COEFFICIENTS = {
+        "Pos_1_Adj_Pt": 0.605,
+        "Pos_1_FGA": -0.330,
+        "Pos_1_FTA": -0.157,
+        "Pos_1_3FG_Bonus": 0.477,
+        "Pos_1_AST": 0.476,
+        "Pos_1_TO": -0.579,
+        "Pos_1_ORB": 0.606,
+        "Pos_1_DRB": -0.112,
+        "Pos_1_TRB": 0.000,
+        "Pos_1_STL": 0.177,
+        "Pos_1_BLK": 0.725,
+        "Pos_1_PF": -0.439,
+        "Pos_5_Adj_Pt": 0.605,
+        "Pos_5_FGA": -0.472,
+        "Pos_5_FTA": -0.224,
+        "Pos_5_3FG_Bonus": 0.477,
+        "Pos_5_AST": 0.476,
+        "Pos_5_TO": -0.882,
+        "Pos_5_ORB": 0.422,
+        "Pos_5_DRB": 0.103,
+        "Pos_5_TRB": 0.000,
+        "Pos_5_STL": 0.294,
+        "Pos_5_BLK": 0.097,
+        "Pos_5_PF": -0.439,
+    }
+
+    BPM_POSITION_CONSTANTS = {
+        "Pos_1": -0.818,
+        "Pos_3": 0,
+        "Pos_5": 0,
+        "Offensive_Role_Slope": 1.387,
+    }
+
+    OBPM_POSITION_CONSTANTS = {
+        "Pos_1": -1.698,
+        "Pos_3": 0,
+        "Pos_5": 0,
+        "Offensive_Role_Slope": 0.43,
+    }
 
     OFFENSIVE_ROLE_COEFFICIENTS = {
         "Intercept": 6,
@@ -84,15 +122,20 @@ class BpmCalculator:
 
         # Maybe reasign AVG_RATING on init
 
-    def calculate_team_adjustment(self, general_game, player_contribution_sum):
+    def calculate_lead_bonus(self, general_game):
         avg_lead = (general_game["Team_A_Score"] - general_game["Team_B_Score"]) / 2
 
         lead_bonus = (0.35 / 2) * avg_lead
-        lead_bonus_sign = (
-            1 if general_game["Team_A_Score"] > general_game["Team_B_Score"] else -1
-        )
-        team_a_lead_bonus = lead_bonus_sign * lead_bonus
-        team_b_lead_bonus = -lead_bonus_sign * lead_bonus
+
+        return lead_bonus
+
+    def calculate_team_adjustment(
+        self, general_game, player_contribution_sum, bpm_type="default"
+    ):
+        lead_bonus = self.calculate_lead_bonus(general_game)
+
+        team_a_lead_bonus = lead_bonus
+        team_b_lead_bonus = -lead_bonus
 
         team_a_ORtg = general_game["Team_A_OE"]
         team_b_ORtg = general_game["Team_B_OE"]
@@ -117,23 +160,34 @@ class BpmCalculator:
             (Team_A_DRtg + Team_B_ORtg) / 2
         )
 
-        team_adjustment = (
-            (Team_A_Game_ORtg + Team_A_Game_DRtg) - player_contribution_sum
-        ) / 5
+        if bpm_type == "offense":
+            team_adjustment = (Team_A_Game_ORtg - player_contribution_sum) / 5
+        else:
+            team_adjustment = (
+                (Team_A_Game_ORtg + Team_A_Game_DRtg) - player_contribution_sum
+            ) / 5
 
-        return team_adjustment
+        return {
+            "team_adjustment": team_adjustment,
+            "Team_A_ORtg": Team_A_ORtg,
+            "Team_A_DRtg": Team_A_DRtg,
+            "Team_B_ORtg": Team_B_ORtg,
+            "Team_B_DRtg": Team_B_DRtg,
+            "Rating_Total_A": Team_A_ORtg + Team_A_DRtg,
+            "Rating_Total_B": Team_B_ORtg + Team_B_DRtg,
+        }
 
-    def calculate_raw_bpm(self, player):
+    def calculate_raw_bpm(self, player, bpm_type="default"):
         game_level_p100p = self.calculate_p_100_p_stats(player, self.game_team_metrics)
         season_level_p100p = self.calculate_p_100_p_stats(
             player, self.season_team_metrics
         )
 
-        scoring = self.calculate_scoring(player, game_level_p100p)
-        ballhandling = self.calculate_ballhandling(player, game_level_p100p)
-        rebounding = self.calculate_rebounding(player, game_level_p100p)
-        defense = self.calculate_defense(player, game_level_p100p)
-        position_adjustment = self.calculate_position_adjustment(player)
+        scoring = self.calculate_scoring(player, game_level_p100p, bpm_type)
+        ballhandling = self.calculate_ballhandling(player, game_level_p100p, bpm_type)
+        rebounding = self.calculate_rebounding(player, game_level_p100p, bpm_type)
+        defense = self.calculate_defense(player, game_level_p100p, bpm_type)
+        position_adjustment = self.calculate_position_adjustment(player, bpm_type)
 
         return scoring + ballhandling + rebounding + defense + position_adjustment
 
@@ -157,14 +211,14 @@ class BpmCalculator:
         }
         return per_100_possessions
 
-    def calculate_scoring(self, player, game_level_p100p):
+    def calculate_scoring(self, player, game_level_p100p, bpm_type="default"):
         # Define the metrics for scoring
         metrics_bpm = ["Adj_Pt", "FGA", "FTA", "3FG_Bonus"]
         p100_metrics = ["Adj_Pt", "FGA", "FTA", "3FG"]
 
         # Compute the BPM values and p100p values
         bpm_values = [
-            self.calculate_bpm_value(player, metric) for metric in metrics_bpm
+            self.calculate_bpm_value(player, metric, bpm_type) for metric in metrics_bpm
         ]
 
         p100p_values = [game_level_p100p[metric] for metric in p100_metrics]
@@ -176,10 +230,7 @@ class BpmCalculator:
         if player["TSA"] == 0:
             return 0
 
-        # For now use rounding so that we can 1-1 the spreadsheet.
-        return math.floor(player["PTS"] / player["TSA"] * 100) / 100
-
-        # return player["PTS"] / player["TSA"]
+        return player["PTS"] / player["TSA"]
 
     def calculate_adj_pts(self, player, metrics):
         pts_tsa = self.calculate_pts_tsa(player)
@@ -206,39 +257,34 @@ class BpmCalculator:
         thresh_pts = tsa * (pts_tsa - (team_pts_tsa + offensive_role_pt_threshold))
         return thresh_pts
 
-    def calculate_ballhandling(
-        self,
-        player,
-        game_level_p100p,
-    ):
+    def calculate_ballhandling(self, player, game_level_p100p, bpm_type="default"):
         # Define the metrics for ballhandling
         metrics_bpm = ["AST", "TO"]
-        metrics_p100p = ["AST", "TO"]
 
         bpm_values = [
-            self.calculate_bpm_value(player, metric) for metric in metrics_bpm
+            self.calculate_bpm_value(player, metric, bpm_type) for metric in metrics_bpm
         ]
         p100p_values = [game_level_p100p[metric] for metric in metrics_bpm]
 
         return np.dot(bpm_values, p100p_values)
 
-    def calculate_rebounding(self, player, game_level_p100p):
+    def calculate_rebounding(self, player, game_level_p100p, bpm_type="default"):
         # Define the metrics for rebounding
         metrics_bpm = ["ORB", "DRB", "TRB"]
 
         bpm_values = [
-            self.calculate_bpm_value(player, metric) for metric in metrics_bpm
+            self.calculate_bpm_value(player, metric, bpm_type) for metric in metrics_bpm
         ]
         p100p_values = [game_level_p100p[metric] for metric in metrics_bpm]
 
         return np.dot(bpm_values, p100p_values)
 
-    def calculate_defense(self, player, game_level_p100p):
+    def calculate_defense(self, player, game_level_p100p, bpm_type="default"):
         # Define the metrics for defense
         metrics_bpm = ["STL", "BLK", "PF"]
 
         bpm_values = [
-            self.calculate_bpm_value(player, metric) for metric in metrics_bpm
+            self.calculate_bpm_value(player, metric, bpm_type) for metric in metrics_bpm
         ]
         p100p_values = [game_level_p100p[metric] for metric in metrics_bpm]
 
@@ -377,28 +423,39 @@ class BpmCalculator:
 
         return name_to_pos_constant
 
-    def calculate_position_adjustment(self, player):
+    def calculate_position_adjustment(self, player, bpm_type="default"):
         player_name = player["Player"]
         position = self.position[player_name]
         pre_slope_adjustment = np.nan
 
+        position_constants = self.BPM_POSITION_CONSTANTS
+
+        if bpm_type == "offense":
+            position_constants = self.OBPM_POSITION_CONSTANTS
+
         if position < 3:
-            pre_slope_adjustment = (position - 1) / 2 * self.POSITION_CONSTANTS[
-                "Pos_3"
-            ] + (3 - position) / 2 * self.POSITION_CONSTANTS["Pos_1"]
+            pre_slope_adjustment = (position - 1) / 2 * position_constants["Pos_3"] + (
+                3 - position
+            ) / 2 * position_constants["Pos_1"]
         else:
-            pre_slope_adjustment = (position - 3) / 2 * self.POSITION_CONSTANTS[
-                "Pos_5"
-            ] + (5 - position) / 2 * self.POSITION_CONSTANTS["Pos_3"]
+            pre_slope_adjustment = (position - 3) / 2 * position_constants["Pos_5"] + (
+                5 - position
+            ) / 2 * position_constants["Pos_3"]
 
         return pre_slope_adjustment + (
-            self.OFFENSIVE_ROLE_SLOPE * (self.offensive_role[player_name] - 3)
+            position_constants["Offensive_Role_Slope"]
+            * (self.offensive_role[player_name] - 3)
         )
 
-    def calculate_bpm_value(self, player, metric):
+    def calculate_bpm_value(self, player, metric, bpm_type="default"):
         player_name = player["Player"]
-        pos_1_coef = self.BPM_COEFFICIENTS[f"Pos_1_{metric}"]
-        pos_5_coef = self.BPM_COEFFICIENTS[f"Pos_5_{metric}"]
+        coefficients = self.BPM_COEFFICIENTS
+
+        if bpm_type == "offense":
+            coefficients = self.OBPM_COEFFICIENTS
+
+        pos_1_coef = coefficients[f"Pos_1_{metric}"]
+        pos_5_coef = coefficients[f"Pos_5_{metric}"]
 
         position = self.position[player_name]
         offensive_role = self.offensive_role[player_name]
@@ -410,23 +467,74 @@ class BpmCalculator:
 
         return (5 - position) / 4 * pos_1_coef + (position - 1) / 4 * pos_5_coef
 
-    def calculate_bpm(self, general_game):
+    def calculate_bpm(self, general_game, bpm_type="default"):
         player_bpm = {}
+        player_perc_min = {}
 
         total_contribution = 0
         for _, player in self.game_df.iterrows():
-            raw_bpm = self.calculate_raw_bpm(player)
+            raw_bpm = self.calculate_raw_bpm(player, bpm_type)
+
             percent_min = player["MP"] / (self.game_team_metrics["Mins"] / 5)
 
             contribution = percent_min * raw_bpm
             total_contribution += contribution
 
             player_bpm[player["Player"]] = raw_bpm
+            player_perc_min[player["Player"]] = percent_min
 
-        team_adjustment = self.calculate_team_adjustment(
-            general_game, total_contribution
+        team_adjustment_obj = self.calculate_team_adjustment(
+            general_game, total_contribution, bpm_type=bpm_type
         )
+        team_adjustment = team_adjustment_obj["team_adjustment"]
 
         final_bpm = {key: value + team_adjustment for key, value in player_bpm.items()}
 
-        return final_bpm
+        return {
+            "box": final_bpm,
+            "team_adjustment_obj": team_adjustment_obj,
+            "percent_min_lookup": player_perc_min,
+        }
+
+    def calculate_all_stats(self, general_game, game_team_metrics):
+        bpm_res = self.calculate_bpm(general_game)
+
+        bpms = bpm_res["box"]
+        adjustment_obj = bpm_res["team_adjustment_obj"]
+        perc_min_lookup = bpm_res["percent_min_lookup"]
+        obpms = self.calculate_bpm(general_game, bpm_type="obpm")["box"]
+        team_a_lead_bonus = self.calculate_lead_bonus(general_game)
+
+        net = {}
+
+        for player, bpm in bpms.items():
+            net_adjustment = (
+                (
+                    bpm
+                    - (team_a_lead_bonus / 5)
+                    - (
+                        (
+                            adjustment_obj["Rating_Total_A"]
+                            + adjustment_obj["Rating_Total_B"]
+                        )
+                        / 2
+                    )
+                    / 5
+                )
+                * perc_min_lookup[player]
+                * (game_team_metrics["Pace"] / 100)
+                * (game_team_metrics["Mins"] / 5 / 40)
+            )
+
+            net[player] = net_adjustment
+
+        combined = {}
+        for player in bpms.keys():
+            combined[player] = {
+                "BPM": bpms[player],
+                "OBPM": obpms[player],
+                "DBPM": bpms[player] - obpms[player],
+                "NET": net[player],
+            }
+
+        return combined

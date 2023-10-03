@@ -1,6 +1,8 @@
 # College Basketball Box Plus Minus (BPM) Calculator
 
-This repository contains code for calculating the Box Plus Minus (BPM) statistic for college basketball players. The BPM is a basketball statistic that provides a comprehensive measure of a player's contribution to the game. This project aims to calculate this statistic based on the formula provided by Bart Torvik.
+This repository contains code for calculating the Box Plus Minus (BPM) statistic for college basketball players. The BPM is a basketball statistic originally created by Daniel Myers, which provides a comprehensive measure of a player's contribution to the game, relative to an average division one player. For a detailed explanation of BPM, you can refer to this Sports Reference article: https://www.sports-reference.com/blog/2020/02/introducing-bpm-2-0/
+
+This project aims to calculate this statistic based on a formula and spreadsheet provided by Bart Torvik.
 
 ## Table of Contents
 
@@ -25,13 +27,13 @@ These instructions will get you a copy of the project up and running on your loc
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/your_username/your_repository.git
+    git clone https://github.com/jonahmiller99/basketball-utils.git
     ```
 
 2. Navigate to the project directory:
 
     ```bash
-    cd your_repository
+    cd basketball-utils
     ```
 
 
@@ -62,4 +64,4 @@ pytest
 
 ## Acknowledgments
 
-- The BPM formula used in this project is provided by Bart Torvik.
+- This module was created with the assistance of a spreadsheet provided by Bart Torvik who runs the analytics site: https://barttorvik.com

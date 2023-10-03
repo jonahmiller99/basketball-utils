@@ -48,13 +48,12 @@ def mock_data():
         "Baseline Pts/TSA": 1.0,
     }
 
-    # Jarrett Culver's data for testing
     jarrett_culver_data = {
-        "MP": 32,  # Mock value, should be taken from data
-        "Pts/TSA": 1.08,  # Season data
-        "Season TSA": 650,  # Season data
-        "Game Pts/TSA": 0.83,  # Game data
-        "Game TSA": 22.8,  # Game data
+        "MP": 32,
+        "Pts/TSA": 1.08,
+        "Season TSA": 650,
+        "Game Pts/TSA": 0.83,
+        "Game TSA": 22.8,
     }
 
     bpm_calculator = BpmCalculator(
@@ -139,14 +138,10 @@ def test_calculate_possessions(mock_data):
     possessions = bpm_calculator.calculate_possessions(
         player_season, season_team_metrics
     )
-    assert possessions == pytest.approx(
-        2036, 0.01
-    )  # Replace 0.0 with the expected value
+    assert possessions == pytest.approx(2036, 0.01)
 
     possessions = bpm_calculator.calculate_possessions(player_game, game_team_metrics)
-    assert possessions == pytest.approx(
-        62.4, 0.01
-    )  # Replace 0.0 with the expected value
+    assert possessions == pytest.approx(62.4, 0.01)
 
 
 def test_calculate_thresh_pts(mock_data):
@@ -164,7 +159,7 @@ def test_calculate_thresh_pts(mock_data):
     ) = mock_data
 
     thresh_pts = bpm_calculator.calculate_thresh_pts(player_season, season_team_metrics)
-    assert thresh_pts == pytest.approx(182, 0.01)  # Replace 0.0 with the expected value
+    assert thresh_pts == pytest.approx(184, 0.01)
 
 
 def test_calculate_position(mock_data):
@@ -183,7 +178,7 @@ def test_calculate_position(mock_data):
     # Assuming the method calculate_position is implemented in BpmCalculator class
     position_vals = bpm_calculator.calculate_position(season_df, season_team_metrics)
 
-    assert len(position_vals) == len(season_df)  # Replace 0.0 with the expected value
+    assert len(position_vals) == len(season_df)
     assert position_vals["Jarrett Culver"] == pytest.approx(2.8, 0.01)
     assert position_vals["Malik Ondigo"] == pytest.approx(4.6, 0.01)
 
@@ -206,7 +201,7 @@ def test_calculate_offensive_role(mock_data):
         season_df, season_team_metrics
     )
 
-    assert len(offensive_roles) == len(season_df)  # Replace 0.0 with the expected value
+    assert len(offensive_roles) == len(season_df)
     # Excel Sheet Rounds to 0.1.......
     assert offensive_roles["Jarrett Culver"] == pytest.approx(1.5, 0.1)
     assert offensive_roles["Davide Moretti"] == pytest.approx(2.1, 0.1)
@@ -344,8 +339,10 @@ def test_calculate_team_adjustment(mock_data):
         general_game_stats,
     ) = mock_data
 
-    raw_bpm = bpm_calculator.calculate_team_adjustment(general_game_stats, 41.88)
-    assert raw_bpm == pytest.approx(-1.16, 0.1)
+    team_adjustment = bpm_calculator.calculate_team_adjustment(
+        general_game_stats, 41.88
+    )["team_adjustment"]
+    assert team_adjustment == pytest.approx(-1.16, 0.1)
 
 
 def test_calculate_bpm(mock_data):
@@ -361,7 +358,7 @@ def test_calculate_bpm(mock_data):
         general_game_stats,
     ) = mock_data
 
-    players = bpm_calculator.calculate_bpm(general_game_stats)
+    players = bpm_calculator.calculate_bpm(general_game_stats)["box"]
     assert players["Jarrett Culver"] == pytest.approx(4.1, 0.1)
     assert players["Matt Mooney"] == pytest.approx(11.3, 0.1)
     assert players["Davide Moretti"] == pytest.approx(4.1, 0.1)
@@ -370,3 +367,49 @@ def test_calculate_bpm(mock_data):
     assert players["Brandone Francis"] == pytest.approx(2.5, 0.1)
     assert players["Kyler Edwards"] == pytest.approx(14.8, 0.1)
     assert players["Deshawn Corprew"] == pytest.approx(8.9, 0.1)
+
+
+def test_calculate_obpm(mock_data):
+    (
+        bpm_calculator,
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+        general_game_stats,
+    ) = mock_data
+
+    players = bpm_calculator.calculate_bpm(general_game_stats, bpm_type="offense")[
+        "box"
+    ]
+    assert players["Jarrett Culver"] == pytest.approx(1.6, 0.1)
+    assert players["Matt Mooney"] == pytest.approx(4.9, 0.1)
+    assert players["Davide Moretti"] == pytest.approx(1.3, 0.1)
+    assert players["Tariq Owens"] == pytest.approx(2.6, 0.1)
+    assert players["Norense Odiase"] == pytest.approx(2.7, 0.1)
+    assert players["Brandone Francis"] == pytest.approx(-0.2, 0.1)
+    assert players["Kyler Edwards"] == pytest.approx(9.4, 0.1)
+    assert players["Deshawn Corprew"] == pytest.approx(0.6, 0.1)
+
+
+def test_calculate_obpm(mock_data):
+    (
+        bpm_calculator,
+        _,
+        _,
+        _,
+        game_team_metrics,
+        _,
+        _,
+        _,
+        general_game_stats,
+    ) = mock_data
+
+    players = bpm_calculator.calculate_all_stats(general_game_stats, game_team_metrics)
+
+    assert players["Jarrett Culver"]["NET"] == pytest.approx(-1.5, 0.1)
+    assert players["Matt Mooney"]["NET"] == pytest.approx(3.1, 0.1)
+    assert players["Davide Moretti"]["NET"] == pytest.approx(-1.4, 0.1)

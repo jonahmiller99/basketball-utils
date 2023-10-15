@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import pandas as pd
-from src.playerBpm import BpmCalculator
+from playerBpm import BpmCalculator
 
 
 @pytest.fixture
@@ -14,17 +14,19 @@ def mock_data():
     season_team_metrics = {
         "Pace": 66,
         "Team Pts": 2765,
+        "Pts": 2765,
         "Team FGA": 2110,
         "Team FTA": 694,
-        "Tm Pts/TSA": 1.13,
+        "Tm Pts/TSA": 1.133359,
         "Baseline Pts/TSA": 1.0,
         "Total Minutes": 7652,
         "Team TRB": 1209,
-        "Team Steal": 278,
+        "Team STL": 278,
         "Team PF": 663,
         "Team AST": 518,
         "Team BLK": 186,
         "Team Games": 38,
+        "Mins": 7652,
     }
 
     general_game_stats = {
@@ -112,7 +114,7 @@ def test_calculate_adj_pts(mock_data):
     ) = mock_data
 
     adj_pts_season = bpm_calculator.calculate_adj_pts(
-        player_season, season_team_metrics
+        player_season, season_team_metrics, aggregation_level="season"
     )
     assert adj_pts_season == pytest.approx(617.3, 0.1)
 
@@ -159,7 +161,7 @@ def test_calculate_thresh_pts(mock_data):
     ) = mock_data
 
     thresh_pts = bpm_calculator.calculate_thresh_pts(player_season, season_team_metrics)
-    assert thresh_pts == pytest.approx(184, 0.01)
+    assert thresh_pts == pytest.approx(182, 0.01)
 
 
 def test_calculate_position(mock_data):
@@ -236,7 +238,7 @@ def test_calculate_scoring(mock_data):
         season_df, game_df, season_team_metrics, game_team_metrics
     )
     scoring = bpm_calculator.calculate_scoring(player_season, game_level_p100p)
-    assert scoring == pytest.approx(6.4, 0.1)
+    assert scoring == pytest.approx(7.0, 0.1)
 
 
 def test_calculate_ballhandling(mock_data):
@@ -369,6 +371,24 @@ def test_calculate_bpm(mock_data):
     assert players["Deshawn Corprew"] == pytest.approx(8.9, 0.1)
 
 
+def test_calculate_raw_bpm_season_level(mock_data):
+    (
+        bpm_calculator,
+        player_season,
+        player_game,
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+    ) = mock_data
+    raw_season_level_bpm = bpm_calculator.calculate_raw_bpm(
+        player_season, bpm_type="default", aggregation_level="season"
+    )
+    assert raw_season_level_bpm == pytest.approx(12.3, 0.1)
+
+
 def test_calculate_obpm(mock_data):
     (
         bpm_calculator,
@@ -408,8 +428,47 @@ def test_calculate_obpm(mock_data):
         general_game_stats,
     ) = mock_data
 
-    players = bpm_calculator.calculate_all_stats(general_game_stats, game_team_metrics)
+    players = bpm_calculator.calculate_all_stats(general_game_stats)
 
     assert players["Jarrett Culver"]["NET"] == pytest.approx(-1.5, 0.1)
     assert players["Matt Mooney"]["NET"] == pytest.approx(3.1, 0.1)
     assert players["Davide Moretti"]["NET"] == pytest.approx(-1.4, 0.1)
+
+
+def test_season_level_stats(mock_data):
+    (
+        bpm_calculator,
+        _,
+        _,
+        _,
+        game_team_metrics,
+        _,
+        _,
+        _,
+        general_game_stats,
+    ) = mock_data
+
+    players = bpm_calculator.calculate_all_stats(
+        general_game_stats, aggregation_level="season"
+    )
+
+    assert players["Jarrett Culver"]["CONTRIB"] == pytest.approx(8.5, 0.1)
+    assert players["Jarrett Culver"]["BPM"] == pytest.approx(10.6, 0.1)
+    assert players["Davide Moretti"]["BPM"] == pytest.approx(7.5, 0.1)
+    assert players["Jarrett Culver"]["OBPM"] == pytest.approx(7.0, 0.1)
+    assert players["Jarrett Culver"]["DBPM"] == pytest.approx(3.6, 0.1)
+
+    assert players["Deshawn Corprew"]["BPM"] == pytest.approx(6.4, 0.1)
+    assert players["Deshawn Corprew"]["OBPM"] == pytest.approx(3.6, 0.1)
+    assert players["Deshawn Corprew"]["DBPM"] == pytest.approx(2.8, 0.1)
+    assert players["Deshawn Corprew"]["CONTRIB"] == pytest.approx(2.1, 0.1)
+
+    assert players["Kyler Edwards"]["BPM"] == pytest.approx(4.4, 0.1)
+    assert players["Kyler Edwards"]["OBPM"] == pytest.approx(1.2, 0.1)
+    assert players["Kyler Edwards"]["DBPM"] == pytest.approx(3.2, 0.1)
+    assert players["Kyler Edwards"]["CONTRIB"] == pytest.approx(2.0, 0.1)
+
+    assert players["Parker Hicks"]["BPM"] == pytest.approx(2.0, 0.1)
+    assert players["Parker Hicks"]["OBPM"] == pytest.approx(0.4, 0.1)
+    assert players["Parker Hicks"]["DBPM"] == pytest.approx(1.6, 0.1)
+    assert players["Parker Hicks"]["CONTRIB"] == pytest.approx(0.066, 0.1)
